@@ -258,6 +258,12 @@ class TextOutput:
                 print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
         print("\n\n")
 
+    def finish(self, data):
+        for letter, students in data.students_index:
+            print(f"{letter}:")
+            for s in sorted(list(students), key=lambda x: x.name):
+                print(f"  {s.index_name:30} {s.grade} {s.teacher.class_list_lookup.title()}")
+            print("")
 
 class ExcelOutput:
 
@@ -362,28 +368,9 @@ class ExcelOutput:
 
             idx += 1
 
-            # print(f"{s.title:30} {guardian1.title():30} {guardian1.email:30} {guardian1.phone if guardian1.phone else '':12}")
-            # if address:
-            #     print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
-
-
-    def finish(self):
+    def finish(self, data):
         self.wb.remove(self.wb.active)
         self.wb.save('output.xlsx')
-
-        # for s in cls.students:
-        #     address = s.address() if s.address() is not None else ''
-        #     guardians = s.guardians
-        #     if guardians:
-        #         guardian1 = guardians[0]
-        #         guardian2 = guardians[1] if len(guardians) > 1 else self.blank_guardian
-        #     else:
-        #         guardian1 = guardian2 = self.blank_guardian
-
-        #     print(f"{s.title:30} {guardian1.title():30} {guardian1.email:30} {guardian1.phone if guardian1.phone else '':12}")
-        #     if address:
-        #         print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
-        # print("\n\n")
 
 parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
 parser.add_argument('--pta-files', nargs='+', help='the PTA directory files')
@@ -391,49 +378,44 @@ parser.add_argument('--class-list', help='the class list file')
 
 args = parser.parse_args()
 
+class AllData:
+    def __init__(self, class_lists, students):
+        self.class_lists = class_lists
+        self.students = students
+
+        self.__update_class_list_data()
+        self.__create_student_index()
+
+    def __update_class_list_data(self):
+        # Replace students in the class list with those from the parent information
+        # since it contains more information
+        for c in class_lists:
+            pta_students = {s: s for s in students if s.teacher == c.teacher}
+
+            class_students = sorted([pta_students[s] if s in pta_students else s for s in c.students])
+            c.students = class_students
+
+            # Replace the teacher with the data from the parent information since it has their full name
+            c.teacher = class_students[0].teacher
+
+    def __create_student_index(self):
+        all_students = []
+        for c in class_lists:
+            all_students.extend(c.students)
+
+        by_last_name_first_letter = lambda x: x.name[0]
+        self.students_index = groupby(sorted(all_students, key=by_last_name_first_letter), key=by_last_name_first_letter)
+
+
 class_lists = ClassListParser.parse_lists(args.class_list)
 students = PtaParser.parse_pta_students(args.pta_files)
 
-for c in class_lists:
-    pta_students = {s: s for s in students if s.teacher == c.teacher}
-
-    class_students = sorted([pta_students[s] if s in pta_students else s for s in c.students])
-    c.students = class_students
-
-    class_students[0].teacher
-    # The class list only lists the last name and room but the report includes the full name so use that version
-    c.teacher = class_students[0].teacher
+data = AllData(class_lists, students)
 
 txt = TextOutput()
 excel = ExcelOutput()
-all_students = []
-for c in class_lists:
-    txt.print_class(c)
-    excel.print_class(c)
-    all_students.extend(c.students)
 
-by_last_name_first_letter = lambda x: x.name[0]
-students_by_letter = groupby(sorted(all_students, key=by_last_name_first_letter), key=by_last_name_first_letter)
-for letter, students in students_by_letter:
-    print(f"{letter}:")
-    for s in sorted(list(students), key=lambda x: x.name):
-        print(f"  {s.index_name:30} {s.grade} {s.teacher.class_list_lookup.title()}")
-    print("")
-print(len(all_students))
-
-excel.finish()
-
-
-
-# by_grade = lambda x: x.grade_order
-# by_teacher = lambda x: x.teacher
-
-# for grade, grade_students in groupby(sorted(students, key=by_grade), key=by_grade):
-#     print(f"Grade: {grade}")
-
-#     # print("\n".join(str(s) for s in sorted(gs, key=lambda x: x.teacher)))
-#     for teacher, teacher_students in groupby(sorted(grade_students, key=by_teacher), key=by_teacher):
-#         print(f"  Teacher: {teacher}")
-#         print("\n".join(f"    {s}" for s in sorted(teacher_students, key=lambda x: x.name)))
-#         print("")
-#     print("")
+for output in [txt, excel]:
+    for c in class_lists:
+        output.print_class(c)
+    output.finish(data)
