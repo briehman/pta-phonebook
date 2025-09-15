@@ -10,12 +10,13 @@ from openpyxl.styles import DEFAULT_FONT, Alignment, Border, Font, NamedStyle, S
 
 def fix_name(s):
     # Mcdonald -> McDonald
-    return re.sub(r" Mc([a-z])", lambda m: " Mc" + m.group(1).upper(), s)
+    return re.sub(r"Mc([a-z])", lambda m: "Mc" + m.group(1).upper(), s)
 
 class Student:
     def __init__(self, name, grade, teacher, guardians=None):
         self.name = name.strip()
-        self.title = fix_name(re.sub(r"(.+),\s+(.+)", r"\2 \1", self.name.strip()).title())
+        self.title = fix_name(re.sub(r"(.+),\s+(.+)", r"\2 \1", self.name).title())
+        self.index_name = fix_name(self.name.title())
         self.grade = grade
         self.teacher = teacher
         self.guardians = guardians
@@ -213,7 +214,7 @@ class ClassListParser:
     def parse_students(teacher, sheet):
         students = []
         for row in sheet.iter_rows(min_row=4, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column):
-            if row[0] is None or row[0].value is None:
+            if row[0] is None or row[0].value is None or "total" in row[0].value.lower():
                 break
 
             s = Student(name=row[0].value, grade=teacher.grade, teacher=teacher)
@@ -235,32 +236,13 @@ class ClassListParser:
         return teachers
 
 
-parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
-parser.add_argument('--pta-files', nargs='+', help='the PTA directory files')
-parser.add_argument('--class-list', help='the class list file')
-
-args = parser.parse_args()
-
-class_lists = ClassListParser.parse_lists(args.class_list)
-students = PtaParser.parse_pta_students(args.pta_files)
-
-for c in class_lists:
-    pta_students = {s: s for s in students if s.teacher == c.teacher}
-
-    class_students = sorted([pta_students[s] if s in pta_students else s for s in c.students])
-    c.students = class_students
-
-    class_students[0].teacher
-    # The class list only lists the last name and room but the report includes the full name so use that version
-    c.teacher = class_students[0].teacher
-
 class TextOutput:
 
     blank_guardian = Guardian(name='', email='', phone='', address='')
 
     def print_class(self, cls):
         print(cls.teacher.title)
-        print(f"{cls.grade.pretty()} - {cls.room} - EMAIL - PHONE")
+        print(f"{cls.grade.pretty()} - {cls.room}")
 
         for s in cls.students:
             address = s.address() if s.address() is not None else ''
@@ -334,7 +316,7 @@ class ExcelOutput:
 
         ws['A1'] = cls.teacher.title
         ws['A1'].style = 'heading'
-        ws['A2'] = f"{cls.grade.pretty()} - {cls.room} - EMAIL - PHONE"
+        ws['A2'] = f"{cls.grade.pretty()} - {cls.room}"
         ws['A2'].style = 'subheading'
 
         ws.append([])
@@ -403,11 +385,41 @@ class ExcelOutput:
         #         print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
         # print("\n\n")
 
+parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
+parser.add_argument('--pta-files', nargs='+', help='the PTA directory files')
+parser.add_argument('--class-list', help='the class list file')
+
+args = parser.parse_args()
+
+class_lists = ClassListParser.parse_lists(args.class_list)
+students = PtaParser.parse_pta_students(args.pta_files)
+
+for c in class_lists:
+    pta_students = {s: s for s in students if s.teacher == c.teacher}
+
+    class_students = sorted([pta_students[s] if s in pta_students else s for s in c.students])
+    c.students = class_students
+
+    class_students[0].teacher
+    # The class list only lists the last name and room but the report includes the full name so use that version
+    c.teacher = class_students[0].teacher
+
 txt = TextOutput()
 excel = ExcelOutput()
+all_students = []
 for c in class_lists:
     txt.print_class(c)
     excel.print_class(c)
+    all_students.extend(c.students)
+
+by_last_name_first_letter = lambda x: x.name[0]
+students_by_letter = groupby(sorted(all_students, key=by_last_name_first_letter), key=by_last_name_first_letter)
+for letter, students in students_by_letter:
+    print(f"{letter}:")
+    for s in sorted(list(students), key=lambda x: x.name):
+        print(f"  {s.index_name:30} {s.grade} {s.teacher.class_list_lookup.title()}")
+    print("")
+print(len(all_students))
 
 excel.finish()
 
