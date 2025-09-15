@@ -2,12 +2,20 @@ import argparse
 import openpyxl
 import re
 import sys
+
 from itertools import groupby
+from openpyxl import Workbook
+from openpyxl.styles import DEFAULT_FONT, Alignment, Border, Font, NamedStyle, Side
+
+
+def fix_name(s):
+    # Mcdonald -> McDonald
+    return re.sub(r" Mc([a-z])", lambda m: " Mc" + m.group(1).upper(), s)
 
 class Student:
     def __init__(self, name, grade, teacher, guardians=None):
         self.name = name.strip()
-        self.title = re.sub(r"(.+),\s+(.+)", r"\2 \1", self.name.strip()).title()
+        self.title = fix_name(re.sub(r"(.+),\s+(.+)", r"\2 \1", self.name.strip()).title())
         self.grade = grade
         self.teacher = teacher
         self.guardians = guardians
@@ -21,7 +29,6 @@ class Student:
     def __eq__(self, other):
         a = (self.grade, self.name)
         b = (other.grade, other.name)
-        # print(f"checking {a} == {b} = {a == b}")
         return a == b
 
     def __lt__(self, other):
@@ -30,18 +37,37 @@ class Student:
     def __str__(self):
         return f"{self.name} {self.title} - Grade {self.grade} - Teacher {self.teacher.title} - Guardians {self.guardians}"
 
-    @staticmethod
-    def parse_from_pta_file(row):
-        has_phone = len(row) >= 7
-        has_address = len(row) == 10
+    def address(self):
+        if self.guardians:
+            addresses = [g.address for g in self.guardians if g.address]
+            if addresses:
+                return next((a for a in addresses if a is not None), None)
+            else:
+                return None
 
+        else:
+            return None
+
+    @staticmethod
+    def parse_from_pta_file(row, has_phone, has_address, guardian_2_index):
         grade = Grade(row[1].value)
 
-        guardian = Guardian(
+        guardians = [Guardian(
                 name=row[4].value,
                 email=row[5].value,
                 phone=row[6].value if has_phone else None,
-                address=row[7].value if has_address else None)
+                address=row[7].value if has_address else None)]
+
+        if len(row) > guardian_2_index:
+            if row[guardian_2_index].value:
+                name2 = row[guardian_2_index].value if row[guardian_2_index] else None
+                email2 = row[guardian_2_index + 1].value if row[guardian_2_index + 1] else None
+                phone2 = row[guardian_2_index + 2].value if row[guardian_2_index + 2] else None
+                guardians.append(Guardian(
+                    name=name2,
+                    email=email2,
+                    phone=phone2,
+                    ))
 
         teacher = Teacher(name=row[2].value, grade=grade)
 
@@ -49,7 +75,7 @@ class Student:
                 name=row[0].value,
                 grade=grade,
                 teacher=teacher,
-                guardians=[guardian])
+                guardians=guardians)
 
 class Grade:
     def __init__(self, value):
@@ -60,6 +86,16 @@ class Grade:
         else:
             self.grade = int(float(stripped))
             self.order = self.grade
+
+    def pretty(self):
+        match self.order:
+            case 0: return "Kindergarten"
+            case 1: return "1st Grade"
+            case 2: return "2nd Grade"
+            case 3: return "3rd Grade"
+            case 4: return "4th Grade"
+            case 5: return "5th Grade"
+            case _: raise ValueError("Invalid grade")
 
     def __lt__(self, other):
         return self.order < other.order
@@ -98,17 +134,20 @@ class Teacher:
     def __eq__(self, other):
         a = (self.grade, self.class_list_lookup)
         b = (other.grade, other.class_list_lookup)
-        # print(f"checking {a} == {b} ? {a == b}")
         return a == b
 
     def add_students(self, students):
         self.students.extend(students)
 
 class Class:
-    def __init__(self, teacher, grade, students):
+    def __init__(self, room, teacher, grade, students):
+        self.room = re.sub(r"# ", "", room.title())
         self.teacher = teacher
         self.grade = grade
         self.students = students
+
+    def title(self):
+        return f"{self.grade.grade} {self.teacher.class_list_lookup}"
 
     def __repr__(self):
         return str(self)
@@ -122,9 +161,11 @@ class Guardian:
         self.email = email.lower()
         self.phone = phone
         self.address = address.title() if address else None
+        if self.address:
+            self.address = re.sub(r"Lombard, IL 60148", "", self.address, flags=re.IGNORECASE)
 
     def title(self):
-        return self.name.title()
+        return fix_name(self.name.title())
 
     def __repr__(self):
         return str(self)
@@ -141,7 +182,16 @@ class PtaParser:
     def __parse_pta_file(f):
         wb = openpyxl.load_workbook(f)
         sheet = wb.active
-        return [Student.parse_from_pta_file(row) for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column)]
+        has_phone = sheet['G1'].value == 'Phone'
+        has_address = sheet['H1'] and sheet['H1'].value == 'Address'
+        if has_address:
+            guardian_2_index = 10
+        elif has_phone:
+            guardian_2_index = 7
+        else:
+            guardian_2_index = 6
+
+        return [Student.parse_from_pta_file(row, has_phone, has_address, guardian_2_index) for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column)]
 
 class ClassListParser:
     @staticmethod
@@ -149,6 +199,7 @@ class ClassListParser:
         teacher_name = re.sub(r" \(.*\)$", "", sheet.cell(1, 1).value.upper().replace('TEACHER: ', '').strip())
         # Transform Kdg, 1st, 2nd, 3rd, 4th, 5th => K, 1, 2, 3, 4, 5
         grade = Grade(sheet.cell(1, 2).value)
+        room = sheet.cell(1, 3).value
 
         if teacher_name != sheet.title:
             raise Exception(f"Expected teacher name {teacher_name} to match sheet title {sheet.title}")
@@ -156,7 +207,7 @@ class ClassListParser:
         teacher = Teacher(teacher_name, grade)
         students = ClassListParser.parse_students(teacher, sheet)
 
-        return Class(teacher, grade, students)
+        return Class(room, teacher, grade, students)
 
     @staticmethod
     def parse_students(teacher, sheet):
@@ -191,17 +242,174 @@ parser.add_argument('--class-list', help='the class list file')
 args = parser.parse_args()
 
 class_lists = ClassListParser.parse_lists(args.class_list)
-
 students = PtaParser.parse_pta_students(args.pta_files)
 
 for c in class_lists:
     pta_students = {s: s for s in students if s.teacher == c.teacher}
 
-    print(c.teacher)
-    class_students = [pta_students[s] if s in pta_students else s for s in c.students]
+    class_students = sorted([pta_students[s] if s in pta_students else s for s in c.students])
+    c.students = class_students
 
-    print("\n".join(str(s) for s in class_students))
-    print("")
+    class_students[0].teacher
+    # The class list only lists the last name and room but the report includes the full name so use that version
+    c.teacher = class_students[0].teacher
+
+class TextOutput:
+
+    blank_guardian = Guardian(name='', email='', phone='', address='')
+
+    def print_class(self, cls):
+        print(cls.teacher.title)
+        print(f"{cls.grade.pretty()} - {cls.room} - EMAIL - PHONE")
+
+        for s in cls.students:
+            address = s.address() if s.address() is not None else ''
+            guardians = s.guardians
+            if guardians:
+                guardian1 = guardians[0]
+                guardian2 = guardians[1] if len(guardians) > 1 else self.blank_guardian
+            else:
+                guardian1 = guardian2 = self.blank_guardian
+
+            print(f"{s.title:30} {guardian1.title():30} {guardian1.email:30} {guardian1.phone if guardian1.phone else '':12}")
+            if address:
+                print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
+        print("\n\n")
+
+
+class ExcelOutput:
+
+    blank_guardian = Guardian(name='', email='', phone='', address='')
+    centered = Alignment(horizontal='center', vertical='center')
+
+
+    def __init__(self):
+        self.wb = openpyxl.Workbook()
+
+        DEFAULT_FONT.name = 'Arial'
+        DEFAULT_FONT.size = 10
+        medium_border = Side(border_style='medium', color='000000')
+        thin_border = Side(border_style='thin', color='000000')
+        self.thin_border = thin_border
+
+        heading = NamedStyle(name='heading')
+        heading.alignment = Alignment(horizontal='center', vertical='center')
+        heading.font = Font(name='Arial', bold=True, size=12)
+        self.wb.add_named_style(heading)
+
+        subheading = NamedStyle(name='subheading')
+        subheading.alignment = Alignment(horizontal='center', vertical='center')
+        subheading.font = Font(name='Arial', bold=True, size=11)
+        self.wb.add_named_style(subheading)
+
+        tableheading = NamedStyle(name='tableheading')
+        tableheading.font = Font(name='Arial', bold=True, size=9)
+        tableheading.border = Border(top=medium_border, bottom=medium_border)
+        self.wb.add_named_style(tableheading)
+
+        tableheadingend = NamedStyle(name='tableheadingend')
+        tableheadingend.font = Font(name='Arial', bold=True, size=9)
+        tableheadingend.border = Border(top=medium_border, bottom=medium_border, right=medium_border)
+        self.wb.add_named_style(tableheadingend)
+
+        student = NamedStyle(name='student')
+        student.font = Font(name='Arial', bold=True, size=11)
+        self.wb.add_named_style(student)
+
+        studentend = NamedStyle(name='studentend')
+        studentend.border = Border(right=thin_border)
+        self.wb.add_named_style(studentend)
+
+    def print_class(self, cls):
+        print(f"Creating sheet {cls.title()}")
+
+        ws = self.wb.create_sheet(title=cls.title())
+        ws.merge_cells('A1:E1')
+        ws.merge_cells('A2:E2')
+        ws.column_dimensions['A'].width = 11
+        ws.column_dimensions['B'].width = 22.5
+        ws.column_dimensions['C'].width = 18.85
+        ws.column_dimensions['D'].width = 31
+        ws.column_dimensions['E'].width = 14
+
+        ws['A1'] = cls.teacher.title
+        ws['A1'].style = 'heading'
+        ws['A2'] = f"{cls.grade.pretty()} - {cls.room} - EMAIL - PHONE"
+        ws['A2'].style = 'subheading'
+
+        ws.append([])
+        ws.append(['Student', 'Family Address', 'Parent/Guardian', 'Email', 'Phone'])
+        ws['A4'].style = 'tableheading'
+        ws['B4'].style = 'tableheading'
+        ws['C4'].style = 'tableheading'
+        ws['D4'].style = 'tableheading'
+        ws['E4'].style = 'tableheadingend'
+
+        idx = 5
+
+        for s in cls.students:
+            address = s.address() if s.address() is not None else ''
+            guardians = s.guardians if s.guardians else []
+            ws.insert_rows(idx=idx)
+            ws.cell(row=idx, column=1)
+            ws[f'A{idx}'] = s.title
+            ws[f'A{idx}'].style = 'student'
+            ws[f'E{idx}'].style = 'studentend'
+            num_guardians = len(guardians)
+            if num_guardians > 0:
+                ws[f'C{idx}'] = guardians[0].title()
+                ws[f'D{idx}'] = guardians[0].email
+                ws[f'E{idx}'] = guardians[0].phone
+
+                if num_guardians > 1 or address:
+                    idx += 1
+                    ws.insert_rows(idx=idx)
+                    ws[f'E{idx}'].style = 'studentend'
+                    if address:
+                        ws[f'B{idx}'] = address
+                    if num_guardians > 1:
+                        ws[f'C{idx}'] = guardians[1].title()
+                        ws[f'D{idx}'] = guardians[1].email
+                        ws[f'E{idx}'] = guardians[1].phone
+            # Put border on bottom
+            ws[f'A{idx}'].border = Border(bottom=self.thin_border)
+            ws[f'B{idx}'].border = Border(bottom=self.thin_border)
+            ws[f'C{idx}'].border = Border(bottom=self.thin_border)
+            ws[f'D{idx}'].border = Border(bottom=self.thin_border)
+            ws[f'E{idx}'].border = Border(bottom=self.thin_border, right=self.thin_border)
+
+            idx += 1
+
+            # print(f"{s.title:30} {guardian1.title():30} {guardian1.email:30} {guardian1.phone if guardian1.phone else '':12}")
+            # if address:
+            #     print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
+
+
+    def finish(self):
+        self.wb.remove(self.wb.active)
+        self.wb.save('output.xlsx')
+
+        # for s in cls.students:
+        #     address = s.address() if s.address() is not None else ''
+        #     guardians = s.guardians
+        #     if guardians:
+        #         guardian1 = guardians[0]
+        #         guardian2 = guardians[1] if len(guardians) > 1 else self.blank_guardian
+        #     else:
+        #         guardian1 = guardian2 = self.blank_guardian
+
+        #     print(f"{s.title:30} {guardian1.title():30} {guardian1.email:30} {guardian1.phone if guardian1.phone else '':12}")
+        #     if address:
+        #         print(f"{"":4} {address:25} {guardian2.title():30} {guardian2.email:30} {str(guardian2.phone):12}")
+        # print("\n\n")
+
+txt = TextOutput()
+excel = ExcelOutput()
+for c in class_lists:
+    txt.print_class(c)
+    excel.print_class(c)
+
+excel.finish()
 
 
 
