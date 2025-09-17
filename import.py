@@ -7,6 +7,7 @@ from itertools import groupby
 from openpyxl import Workbook
 from openpyxl.styles import DEFAULT_FONT, Alignment, Border, Font, NamedStyle, Side
 
+YEAR = '2025-2026'
 
 def fix_name(s):
     # Mcdonald -> McDonald
@@ -168,6 +169,12 @@ class Guardian:
     def title(self):
         return fix_name(self.name.title())
 
+    def phone_link(self):
+        return f"tel:+1{self.phone.replace('-', '')}" if self.phone else ''
+
+    def email_link(self):
+        return f"mailto:t{self.email}" if self.email else ''
+
     def __repr__(self):
         return str(self)
 
@@ -270,6 +277,9 @@ class ExcelOutput:
     blank_guardian = Guardian(name='', email='', phone='', address='')
     centered = Alignment(horizontal='center', vertical='center')
 
+    @staticmethod
+    def google_width(num):
+        return num / 7
 
     def __init__(self):
         self.wb = openpyxl.Workbook()
@@ -320,74 +330,129 @@ class ExcelOutput:
         self.wb.add_named_style(indexstudent)
 
         self.create_welcome()
-
+        self.create_staff()
 
     def create_welcome(self):
-        welcome = self.wb.create_sheet(title='Welcome')
-        welcome.column_dimensions['A'].width = 97
+        ws = self.wb.create_sheet(title='Welcome')
+        margins = ws.page_margins
+        margins.left = margins.right = margins.bottom = 0.25
+        margins.top = 0.5
 
-        welcome['A2'] = 'PTA PHONE BOOK'
-        welcome['A2'].font = Font(name='Arial', bold=True, size=24)
-        welcome['A2'].alignment = Alignment(horizontal='center')
+        ws.column_dimensions['A'].width = 97
 
-        welcome['A3'] = '2025-2026'
-        welcome['A3'].font = Font(name='Arial', bold=True, size=14)
-        welcome['A3'].alignment = Alignment(horizontal='center')
+        ws['A2'] = 'PTA PHONE BOOK'
+        ws['A2'].font = Font(name='Arial', bold=True, size=24)
+        ws['A2'].alignment = Alignment(horizontal='center')
 
-        welcome['A6'] = 'WILLIAM HAMMERSCHMIDT SCHOOL'
-        welcome['A6'].font = Font(name='Arial', bold=True, size=20)
-        welcome['A6'].alignment = Alignment(horizontal='center')
+        ws['A3'] = YEAR
+        ws['A3'].font = Font(name='Arial', bold=True, size=14)
+        ws['A3'].alignment = Alignment(horizontal='center')
 
-        welcome['A7'] = '617 Hammerschmidt Avenue'
-        welcome['A7'].font = Font(name='Arial', size=14)
-        welcome['A7'].alignment = Alignment(horizontal='center')
+        ws['A6'] = 'WILLIAM HAMMERSCHMIDT SCHOOL'
+        ws['A6'].font = Font(name='Arial', bold=True, size=20)
+        ws['A6'].alignment = Alignment(horizontal='center')
 
-        welcome['A8'] = 'Lombard, IL 60148'
-        welcome['A8'].font = Font(name='Arial', size=14)
-        welcome['A8'].alignment = Alignment(horizontal='center')
+        ws['A7'] = '617 Hammerschmidt Avenue'
+        ws['A7'].font = Font(name='Arial', size=14)
+        ws['A7'].alignment = Alignment(horizontal='center')
 
-        welcome['A11'] = 'Phone: 630-827-4200    Fax: 630-620-3733'
-        welcome['A11'].font = Font(name='Arial', size=14)
-        welcome['A11'].alignment = Alignment(horizontal='center')
+        ws['A8'] = 'Lombard, IL 60148'
+        ws['A8'].font = Font(name='Arial', size=14)
+        ws['A8'].alignment = Alignment(horizontal='center')
 
-        welcome['A13'] = 'VOICEMAIL/ATTENDANCE 630-827-4201'
-        welcome['A13'].font = Font(name='Arial', size=14)
-        welcome['A13'].alignment = Alignment(horizontal='center')
+        ws['A11'] = 'Phone: 630-827-4200    Fax: 630-620-3733'
+        ws['A11'].font = Font(name='Arial', size=14)
+        ws['A11'].alignment = Alignment(horizontal='center')
 
-        welcome['A16'] = 'School District 44'
-        welcome['A16'].font = Font(name='Arial', size=14)
-        welcome['A16'].alignment = Alignment(horizontal='center')
+        ws['A13'] = 'VOICEMAIL/ATTENDANCE 630-827-4201'
+        ws['A13'].font = Font(name='Arial', size=14)
+        ws['A13'].alignment = Alignment(horizontal='center')
 
-        welcome['A17'] = 'Website: www.sd44.org'
-        welcome['A17'].font = Font(name='Arial', size=14)
-        welcome['A17'].alignment = Alignment(horizontal='center')
+        ws['A16'] = 'School District 44'
+        ws['A16'].font = Font(name='Arial', size=14)
+        ws['A16'].alignment = Alignment(horizontal='center')
 
-        welcome['A19'] = 'Mr. David Danielski'
-        welcome['A19'].font = Font(name='Arial', size=14)
-        welcome['A19'].alignment = Alignment(horizontal='center')
+        ws['A17'] = 'Website: www.sd44.org'
+        ws['A17'].font = Font(name='Arial', size=14)
+        ws['A17'].alignment = Alignment(horizontal='center')
 
-        welcome['A20'] = 'PRINCIPAL'
-        welcome['A20'].font = Font(name='Arial', size=14)
-        welcome['A20'].alignment = Alignment(horizontal='center')
+        ws['A19'] = 'Mr. David Danielski'
+        ws['A19'].font = Font(name='Arial', size=14)
+        ws['A19'].alignment = Alignment(horizontal='center')
 
-        welcome['A22'] = 'Ms. Liz Valdivia'
-        welcome['A22'].font = Font(name='Arial', size=14)
-        welcome['A22'].alignment = Alignment(horizontal='center')
+        ws['A20'] = 'PRINCIPAL'
+        ws['A20'].font = Font(name='Arial', size=14)
+        ws['A20'].alignment = Alignment(horizontal='center')
 
-        welcome['A23'] = 'SECRETARY'
-        welcome['A23'].font = Font(name='Arial', size=14)
-        welcome['A23'].alignment = Alignment(horizontal='center')
+        ws['A22'] = 'Ms. Liz Valdivia'
+        ws['A22'].font = Font(name='Arial', size=14)
+        ws['A22'].alignment = Alignment(horizontal='center')
 
-        welcome['A33'] = "THIS PTA PHONE BOOK IS FOR PARENT AND STUDENT USE ONLY,\nNOT FOR COMMERCIAL USE."
-        welcome['A33'].font = Font(name='Arial', size=14)
-        welcome['A33'].alignment = Alignment(horizontal='center', wrapText=True)
+        ws['A23'] = 'SECRETARY'
+        ws['A23'].font = Font(name='Arial', size=14)
+        ws['A23'].alignment = Alignment(horizontal='center')
 
-        welcome['A35'] = 'This Phone Book is sponsored by the WHS PTA and is issued free, one per member family.'
-        welcome['A35'].font = Font(name='Arial', size=12)
-        welcome['A35'].alignment = Alignment(horizontal='center')
+        ws['A33'] = "THIS PTA PHONE BOOK IS FOR PARENT AND STUDENT USE ONLY,\nNOT FOR COMMERCIAL USE."
+        ws['A33'].font = Font(name='Arial', size=14)
+        ws['A33'].alignment = Alignment(horizontal='center', wrapText=True)
+
+        ws['A35'] = 'This Phone Book is sponsored by the WHS PTA and is issued free, one per member family.'
+        ws['A35'].font = Font(name='Arial', size=12)
+        ws['A35'].alignment = Alignment(horizontal='center')
+
+    def create_staff(self):
+        ws = self.wb.create_sheet(title='Staff')
+        margins = ws.page_margins
+        margins.left = margins.right = margins.bottom = 0.25
+        margins.top = 0.5
+
+        ws.column_dimensions['A'].width = ExcelOutput.google_width(128)
+        ws.column_dimensions['B'].width = ExcelOutput.google_width(140)
+        ws.column_dimensions['C'].width = ExcelOutput.google_width(35)
+        ws.column_dimensions['D'].width = ExcelOutput.google_width(26)
+        ws.column_dimensions['E'].width = ExcelOutput.google_width(114)
+        ws.column_dimensions['F'].width = ExcelOutput.google_width(33)
+        ws.column_dimensions['G'].width = ExcelOutput.google_width(72)
+        ws.column_dimensions['H'].width = ExcelOutput.google_width(146)
+        ws.column_dimensions['I'].width = ExcelOutput.google_width(34)
+
+        ws.merge_cells('A1:I1')
+        ws['A1'] = 'HAMMERSCHMIDT STAFF'
+        ws['A1'].style = 'heading'
+        ws['A1'].alignment = Alignment(horizontal = 'center', vertical='bottom')
+
+        ws['A3'] = 'OFFICE'
+        ws['A3'].font = Font(name='Arial', bold=True, size=10)
+        ws['A3'].border = Border(bottom=self.thin_border)
+        ws['B3'] = 'EMAIL'
+        ws['B3'].font = Font(name='Arial', bold=True, size=10)
+        ws['B3'].border = Border(bottom=self.thin_border)
+        ws['C3'] = 'EXT.'
+        ws['C3'].font = Font(name='Arial', bold=True, size=10)
+        ws['C3'].border = Border(bottom=self.thin_border)
+
+        ws['E3'] = 'TEACHER'
+        ws['E3'].font = Font(name='Arial', bold=True, size=10)
+        ws['E3'].border = Border(bottom=self.thin_border)
+        ws['F3'].border = Border(bottom=self.thin_border)
+        ws['G3'] = 'GRADE'
+        ws['G3'].font = Font(name='Arial', bold=True, size=10)
+        ws['G3'].border = Border(bottom=self.thin_border)
+        ws['H3'] = 'EMAIL'
+        ws['H3'].font = Font(name='Arial', bold=True, size=10)
+        ws['H3'].border = Border(bottom=self.thin_border)
+        ws['I3'] = 'EXT.'
+        ws['I3'].font = Font(name='Arial', bold=True, size=10)
+        ws['I3'].border = Border(bottom=self.thin_border)
+
+
 
     def print_class(self, cls):
         ws = self.wb.create_sheet(title=cls.title())
+        margins = ws.page_margins
+        margins.left = margins.right = margins.bottom = 0.25
+        margins.top = 0.5
+
         ws.merge_cells('A1:E1')
         ws.merge_cells('A2:E2')
         ws.column_dimensions['A'].width = 11
@@ -422,9 +487,11 @@ class ExcelOutput:
             num_guardians = len(guardians)
             if num_guardians > 0:
                 ws[f'C{idx}'] = guardians[0].title()
-                ws[f'D{idx}'] = guardians[0].email
+                ws[f'D{idx}'].hyperlink = guardians[0].email_link()
+                ws[f'D{idx}'].value = guardians[0].email
                 ws[f'D{idx}'].alignment = Alignment(wrap_text=True)
-                ws[f'E{idx}'] = guardians[0].phone
+                ws[f'E{idx}'].hyperlink = guardians[0].phone_link()
+                ws[f'E{idx}'].value = guardians[0].phone
 
                 if num_guardians > 1 or address:
                     idx += 1
@@ -434,8 +501,10 @@ class ExcelOutput:
                         ws[f'B{idx}'] = address
                     if num_guardians > 1:
                         ws[f'C{idx}'] = guardians[1].title()
-                        ws[f'D{idx}'] = guardians[1].email
-                        ws[f'E{idx}'] = guardians[1].phone
+                        ws[f'D{idx}'].hyperlink = guardians[1].email_link()
+                        ws[f'D{idx}'].value = guardians[1].email
+                        ws[f'E{idx}'].hyperlink = guardians[1].phone_link()
+                        ws[f'E{idx}'].value = guardians[1].phone
             # Put border on bottom
             ws[f'A{idx}'].border = Border(bottom=self.thin_border)
             ws[f'B{idx}'].border = Border(bottom=self.thin_border)
@@ -445,14 +514,138 @@ class ExcelOutput:
 
             idx += 1
 
+        for row_num in range(1, ws.max_row + 1):
+            ws.row_dimensions[row_num].height = 13
+
     def finish(self, data):
         self.wb.remove(self.wb.active)
+        self.create_index(data)
+        self.create_thank_you_page()
+        self.create_pta_board_page()
+        self.create_pta_calendar_page()
+        self.wb.save('output.xlsx')
 
+    def create_thank_you_page(self):
+        ws = self.wb.create_sheet(title='Thank You')
+        margins = ws.page_margins
+        margins.left = margins.right = 0.7
+        margins.top = margins.bottom = 0.75
+
+        ws.column_dimensions['A'].width = 37.7
+        ws.column_dimensions['B'].width = 24.4
+        ws.column_dimensions['C'].width = 11.1
+
+        ws['B2'] = 'Many thanks to Mr. Hoganson and Graphics Arts Services, Inc.'
+        ws['B2'].style = 'subheading'
+        ws['B3'] = 'for helping format this PTA phone book!'
+        ws['B3'].style = 'subheading'
+
+        ws['B5'] = 'Thank you so much to Mrs. Hoganson for coordinating'
+        ws['B5'].style = 'subheading'
+        ws['B6'] = 'the student-created artwork for the covers.'
+        ws['B6'].style = 'subheading'
+
+        ws['B8'] = 'Great job to the many students who submitted artwork for the covers!'
+        ws['B8'].style = 'subheading'
+        ws['A10'] = 'Front cover'
+        ws['A10'].alignment = Alignment(horizontal='right')
+        ws['A10'].font = Font(italic=True)
+        ws['A11'] = 'Inside front cover'
+        ws['A11'].alignment = Alignment(horizontal='right')
+        ws['A11'].font = Font(italic=True)
+        ws['A12'] = 'Inside back cover'
+        ws['A12'].alignment = Alignment(horizontal='right')
+        ws['A12'].font = Font(italic=True)
+        ws['A13'] = 'Back cover'
+        ws['A13'].alignment = Alignment(horizontal='right')
+        ws['A13'].font = Font(italic=True)
+
+        ws['B10'] = 'Name 1'
+        ws['B10'].style = 'subheading'
+        ws['C10'] = 'Nth grade'
+        ws['B11'] = 'Name 2'
+        ws['B11'].style = 'subheading'
+        ws['C11'] = 'Nth grade'
+        ws['B12'] = 'Name 3'
+        ws['B12'].style = 'subheading'
+        ws['C12'] = 'Nth grade'
+        ws['B13'] = 'Name 4'
+        ws['B13'].style = 'subheading'
+        ws['C13'] = 'Nth grade'
+
+        img = openpyxl.drawing.image.Image('making-a-difference.png')
+        img.anchor = 'B15'
+        ws['B15'].alignment = Alignment(horizontal='center')
+        ws.add_image(img)
+
+        ws['B25'] = 'Want to get involved in the PTA?'
+        ws['B25'].font = Font(name='Arial', bold=True, size=14)
+        ws['B25'].alignment = Alignment(horizontal='center')
+        ws['B27'] = 'There are opportunities year round to help make'
+        ws['B27'].font = Font(name='Arial', bold=True, size=14)
+        ws['B27'].alignment = Alignment(horizontal='center')
+        ws['B28'] = 'Hammerschmidt even more amazing for our kids.'
+        ws['B28'].font = Font(name='Arial', bold=True, size=14)
+        ws['B28'].alignment = Alignment(horizontal='center')
+        ws['B29'] = 'We have options for every parent and every schedule!'
+        ws['B29'].font = Font(name='Arial', bold=True, size=14)
+        ws['B29'].alignment = Alignment(horizontal='center')
+
+        ws['B31'] = 'Please join us at a monthly PTA meeting'
+        ws['B31'].font = Font(name='Arial', bold=True, size=14)
+        ws['B31'].alignment = Alignment(horizontal='center')
+        ws['B32'] = 'or contact hammerschmidtpta@gmail.com'
+        ws['B32'].font = Font(name='Arial', bold=True, size=14)
+        ws['B32'].alignment = Alignment(horizontal='center')
+        ws['B33'] = 'for more information about how you can get involved. '
+        ws['B33'].font = Font(name='Arial', bold=True, size=14)
+        ws['B33'].alignment = Alignment(horizontal='center')
+
+    def create_pta_board_page(self):
+        ws = self.wb.create_sheet(title='PTA Board')
+        margins = ws.page_margins
+        margins.left = margins.right = 0.25
+        margins.top = margins.bottom = 0.5
+
+        ws.column_dimensions['A'].width = 30.7
+        ws.column_dimensions['B'].width = 27.8
+        ws.column_dimensions['C'].width = 272
+
+        ws['B2'] = f'William Hammerschmidt School PTA Board {YEAR}'
+        ws['B2'].alignment = Alignment(horizontal='center')
+        ws['B2'].font = Font(size=13, bold=True)
+
+    def create_pta_calendar_page(self):
+        ws = self.wb.create_sheet(title='PTA Calendar')
+        margins = ws.page_margins
+        margins.left = 0.5
+        margins.right = 0.25
+        margins.top = margins.bottom = 0.25
+
+        ws.column_dimensions['A'].width = 6.42
+        ws.column_dimensions['B'].width = 7.71
+        ws.column_dimensions['C'].width = 14.2
+        ws.column_dimensions['D'].width = 14.2
+        ws.column_dimensions['E'].width = 15.85
+        ws.column_dimensions['F'].width = 8.85
+        ws.column_dimensions['G'].width = 14.2
+
+        ws['D2'] = f'{YEAR} Hammerschmidt PTA Calendar'
+        ws['D2'].style = 'subheading'
+        ws['D2'].alignment = Alignment(horizontal='left')
+
+    def create_index(self, data):
         ws = self.wb.create_sheet(title='Index')
+        margins = ws.page_margins
+        margins.left = margins.right = 0.15
+        margins.top = 0.35
+        margins.bottom = 0.25
+
         ws.merge_cells('A1:G1')
         ws.merge_cells('A2:G2')
         ws['A1'] = 'STUDENT INDEX'
         ws['A1'].style = 'heading'
+        ws['A1'].alignment = Alignment(horizontal = 'center', vertical='bottom')
         ws['A1'].font = Font(name='Arial', bold=True, size=11)
         ws['A1'].border = Border(bottom=self.medium_border)
         ws['A2'] = 'Last Name, First Name, Grade, Teacher'
@@ -476,7 +669,7 @@ class ExcelOutput:
         for letter, students in data.students_index:
             pos.next_letter()
 
-            print(f"{pos.letter_merge()} : {pos.letter()}: {letter}")
+            # print(f"{pos.letter_merge()} : {pos.letter()}: {letter}")
             ws.merge_cells(pos.letter_merge())
             ws[pos.letter()] = letter
             ws[pos.letter()].style = 'indexletter'
@@ -489,10 +682,13 @@ class ExcelOutput:
                 ws[pos.pos(1)].style = 'indexstudent'
                 ws[pos.pos(2)] = s.teacher.class_list_lookup.title()
                 ws[pos.pos(2)].style = 'indexstudent'
-                print(f"{pos.pos()}: {s.index_name:30} {s.grade} {s.teacher.class_list_lookup.title()}")
-            print("")
+                # print(f"{pos.pos()}: {s.index_name:30} {s.grade} {s.teacher.class_list_lookup.title()}")
+            # print("")
 
-        self.wb.save('output.xlsx')
+        for row_num in range(1, ws.max_row + 1):
+            ws.row_dimensions[row_num].height = 12
+
+
 
 class ExcelIndexPositioner:
     """
@@ -500,7 +696,7 @@ class ExcelIndexPositioner:
     using a two column structure
     """
 
-    def __init__(self, page_height=62, page_buffer=4, columns=['A', 'E'], letter_start_index=4, student_start_index = 6):
+    def __init__(self, page_height=62, page_buffer=4, columns=['A', 'E'], letter_start_index=1, student_start_index=1):
         self.letter_start_index = letter_start_index
         self.student_start_index = student_start_index
         self.index = 2
@@ -509,6 +705,7 @@ class ExcelIndexPositioner:
         self.columns = columns
         self.column_index = 0
         self.page = 0
+        self.page_start_letter = True # First page always starts with a letter
 
     def letter_merge(self):
         return f"{self.columns[self.column_index][0]}{self.index-1}:{self.columns[self.column_index][-1]}{self.index}"
@@ -520,36 +717,39 @@ class ExcelIndexPositioner:
         return f"{self.columns[self.column_index][col]}{self.index}"
 
     def next_letter(self):
-        self.allocate_space(size=3, buffer=4, start_index=self.letter_start_index)
+        self.allocate_space(size=3, buffer=4, start_index=self.letter_start_index, is_letter=True)
 
     def is_last_column(self):
         return self.column_index == len(self.columns) - 1
 
     def has_enough_space_in_column(self, buffer):
         limit = (self.page+1) * self.page_height - buffer
-        print(f"  {self.index} < {limit}? {self.index < limit}")
+        # print(f"  {self.index} < {limit}? {self.index < limit}")
         return self.index < limit
 
     def next_student(self):
         self.allocate_space(size=1, buffer=1, start_index=self.student_start_index)
 
-    def allocate_space(self, size, buffer, start_index):
+    def allocate_space(self, size, buffer, start_index, is_letter=False):
         if self.has_enough_space_in_column(buffer=buffer):
             # Enough space, use same column
             self.index += size
         elif self.is_last_column():
             # Move down a page
+            # print(f"Moving down a page to start index of {start_index} added to {self.page * self.page_height}")
             self.page += 1
             self.column_index = 0
             self.index = self.page * self.page_height + start_index
+            self.page_start_letter = is_letter
         else:
             # Move over a column
             self.column_index = (self.column_index + 1) % len(self.columns)
+            self.index = self.page * self.page_height + start_index
             if self.page == 0:
-                print(f"  moving to start index of {start_index}")
-                self.index = start_index
-            else:
-                self.index = self.page * self.page_height + start_index
+                self.index += 4
+            if self.page_start_letter:
+                self.index += 1
+            # print(f"  moving to start index of {start_index}")
 
 parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
 parser.add_argument('--pta-files', nargs='+', help='the PTA directory files')
