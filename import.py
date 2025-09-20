@@ -5,6 +5,7 @@ import sys
 
 from itertools import groupby
 from openpyxl import Workbook
+from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.styles import DEFAULT_FONT, Alignment, Border, Font, NamedStyle, Side
 
 YEAR = '2025-2026'
@@ -15,7 +16,8 @@ def fix_name(s):
 
 class Student:
     def __init__(self, name, grade, teacher, guardians=None):
-        self.name = name.strip()
+        # Strip any suffixes like I, II, III, etc since that was included in the class list but not the parent file
+        self.name = re.sub(r", I+$", "", name.strip())
         self.title = fix_name(re.sub(r"(.+),\s+(.+)", r"\2 \1", self.name).title())
         self.index_name = fix_name(self.name.title())
         self.grade = grade
@@ -51,7 +53,7 @@ class Student:
             return None
 
     @staticmethod
-    def parse_from_pta_file(row, has_phone, has_address, guardian_2_index):
+    def parse_from_parent_file(row, has_phone, has_address, guardian_2_index):
         grade = Grade(row[1].value)
 
         guardians = [Guardian(
@@ -170,7 +172,7 @@ class Guardian:
         return fix_name(self.name.title())
 
     def phone_link(self):
-        return f"tel:+1{self.phone.replace('-', '')}" if self.phone else ''
+        return f"https://call.ctrlq.org/1{self.phone.replace('-', '')}" if self.phone else ''
 
     def email_link(self):
         return f"mailto:t{self.email}" if self.email else ''
@@ -181,13 +183,13 @@ class Guardian:
     def __str__(self):
         return f"{self.title()} {self.email} {self.phone} {self.address}"
 
-class PtaParser:
+class ParentParser:
     @staticmethod
-    def parse_pta_students(pta_files):
-        return [s for f in pta_files for s in PtaParser.__parse_pta_file(f)]
+    def parse_parent_students(parent_files):
+        return [s for f in parent_files for s in ParentParser.__parse_parent_file(f)]
 
     @staticmethod
-    def __parse_pta_file(f):
+    def __parse_parent_file(f):
         wb = openpyxl.load_workbook(f)
         sheet = wb.active
         has_phone = sheet['G1'].value == 'Phone'
@@ -199,7 +201,7 @@ class PtaParser:
         else:
             guardian_2_index = 6
 
-        return [Student.parse_from_pta_file(row, has_phone, has_address, guardian_2_index) for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column)]
+        return [Student.parse_from_parent_file(row, has_phone, has_address, guardian_2_index) for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column)]
 
 class ClassListParser:
     @staticmethod
@@ -281,8 +283,10 @@ class ExcelOutput:
     def google_width(num):
         return num / 7
 
-    def __init__(self):
+    def __init__(self, data):
         self.wb = openpyxl.Workbook()
+
+        self.data = data
 
         DEFAULT_FONT.name = 'Arial'
         DEFAULT_FONT.size = 10
@@ -313,6 +317,7 @@ class ExcelOutput:
 
         student = NamedStyle(name='student')
         student.font = Font(name='Arial', bold=True, size=11)
+        student.border = Border(left=thin_border)
         self.wb.add_named_style(student)
 
         studentend = NamedStyle(name='studentend')
@@ -330,6 +335,7 @@ class ExcelOutput:
         self.wb.add_named_style(indexstudent)
 
         self.create_welcome()
+        self.create_toc()
         self.create_staff()
 
     def create_welcome(self):
@@ -400,6 +406,58 @@ class ExcelOutput:
         ws['A35'].font = Font(name='Arial', size=12)
         ws['A35'].alignment = Alignment(horizontal='center')
 
+    def create_toc(self):
+        ws = self.wb.create_sheet(title='Table of Contents')
+        margins = ws.page_margins
+        margins.left = margins.right = margins.bottom = 0.25
+        margins.top = 0.5
+
+        ws.column_dimensions['A'].width = ExcelOutput.google_width(128)
+        ws.column_dimensions['B'].width = ExcelOutput.google_width(140)
+        ws.column_dimensions['C'].width = ExcelOutput.google_width(35)
+        ws.column_dimensions['D'].width = ExcelOutput.google_width(26)
+        ws.column_dimensions['E'].width = ExcelOutput.google_width(114)
+        ws.column_dimensions['F'].width = ExcelOutput.google_width(33)
+        ws.column_dimensions['G'].width = ExcelOutput.google_width(72)
+        ws.column_dimensions['H'].width = ExcelOutput.google_width(146)
+        ws.column_dimensions['I'].width = ExcelOutput.google_width(34)
+
+
+        ws['C1'] = 'Table of Contents'
+        ws['C1'].style = 'heading'
+
+        ws['B3'] = 'Resources'
+        ws['B3'].style = 'subheading'
+        ws['B3'].alignment = Alignment()
+
+        ws['B4'] = 'Staff'
+        ws['B4'].hyperlink = Hyperlink(ref="A1", location=f"Staff!A1", target=None)
+        ws['B4'].font = Font(underline='single', color='000000')
+
+        ws['B5'] = 'Student Index'
+        ws['B5'].hyperlink = Hyperlink(ref="A1", location=f"Student Index!A1", target=None)
+        ws['B5'].font = Font(underline='single', color='000000')
+
+        ws['B6'] = 'PTA Board'
+        ws['B6'].hyperlink = Hyperlink(ref="A1", location=f"PTA Board!A1", target=None)
+        ws['B6'].font = Font(underline='single', color='000000')
+
+        ws['B7'] = 'PTA Calendar'
+        ws['B7'].hyperlink = Hyperlink(ref="A1", location=f"PTA Calendar!A1", target=None)
+        ws['B7'].font = Font(underline='single', color='000000')
+
+        ws['D3'] = 'Class Lists'
+        ws['D3'].style = 'subheading'
+        ws['D3'].alignment = Alignment()
+
+        index = 4
+        for c in data.class_lists:
+            ws[f'D{index}'].value = c.title()
+            ws[f'D{index}'].hyperlink = Hyperlink(ref="A1", location=f"{c.title()}!A1", target=None)
+            ws[f'D{index}'].font = Font(underline='single', color='000000')
+            index += 1
+
+
     def create_staff(self):
         ws = self.wb.create_sheet(title='Staff')
         margins = ws.page_margins
@@ -446,7 +504,6 @@ class ExcelOutput:
         ws['I3'].border = Border(bottom=self.thin_border)
 
 
-
     def print_class(self, cls):
         ws = self.wb.create_sheet(title=cls.title())
         margins = ws.page_margins
@@ -458,7 +515,7 @@ class ExcelOutput:
         ws.column_dimensions['A'].width = 11
         ws.column_dimensions['B'].width = 22.5
         ws.column_dimensions['C'].width = 19
-        ws.column_dimensions['D'].width = 28
+        ws.column_dimensions['D'].width = 34.6
         ws.column_dimensions['E'].width = 14
 
         ws['A1'] = cls.teacher.title
@@ -485,17 +542,23 @@ class ExcelOutput:
             ws[f'A{idx}'].style = 'student'
             ws[f'E{idx}'].style = 'studentend'
             num_guardians = len(guardians)
+
             if num_guardians > 0:
                 ws[f'C{idx}'] = guardians[0].title()
                 ws[f'D{idx}'].hyperlink = guardians[0].email_link()
                 ws[f'D{idx}'].value = guardians[0].email
-                ws[f'D{idx}'].alignment = Alignment(wrap_text=True)
+                ws[f'D{idx}'].font = Font(underline='single', color='000000')
+                ws[f'D{idx}'].alignment = Alignment(wrap_text=True, vertical='center')
+
                 ws[f'E{idx}'].hyperlink = guardians[0].phone_link()
                 ws[f'E{idx}'].value = guardians[0].phone
+                ws[f'E{idx}'].font = Font(underline='single', color='000000')
+                ws[f'E{idx}'].alignment = Alignment(wrap_text=True, vertical='center')
 
                 if num_guardians > 1 or address:
                     idx += 1
                     ws.insert_rows(idx=idx)
+                    ws[f'A{idx}'].style = 'student'
                     ws[f'E{idx}'].style = 'studentend'
                     if address:
                         ws[f'B{idx}'] = address
@@ -506,7 +569,7 @@ class ExcelOutput:
                         ws[f'E{idx}'].hyperlink = guardians[1].phone_link()
                         ws[f'E{idx}'].value = guardians[1].phone
             # Put border on bottom
-            ws[f'A{idx}'].border = Border(bottom=self.thin_border)
+            ws[f'A{idx}'].border = Border(left=self.thin_border, bottom=self.thin_border)
             ws[f'B{idx}'].border = Border(bottom=self.thin_border)
             ws[f'C{idx}'].border = Border(bottom=self.thin_border)
             ws[f'D{idx}'].border = Border(bottom=self.thin_border)
@@ -514,8 +577,9 @@ class ExcelOutput:
 
             idx += 1
 
-        for row_num in range(1, ws.max_row + 1):
-            ws.row_dimensions[row_num].height = 13
+        # TODO maybe needed? but if we set this then the text wrapping does not work
+        # for row_num in range(1, ws.max_row + 1):
+        #     ws.row_dimensions[row_num].height = 13
 
     def finish(self, data):
         self.wb.remove(self.wb.active)
@@ -635,7 +699,7 @@ class ExcelOutput:
         ws['D2'].alignment = Alignment(horizontal='left')
 
     def create_index(self, data):
-        ws = self.wb.create_sheet(title='Index')
+        ws = self.wb.create_sheet(title='Student Index')
         margins = ws.page_margins
         margins.left = margins.right = 0.15
         margins.top = 0.35
@@ -736,23 +800,25 @@ class ExcelIndexPositioner:
             self.index += size
         elif self.is_last_column():
             # Move down a page
-            # print(f"Moving down a page to start index of {start_index} added to {self.page * self.page_height}")
             self.page += 1
+            page_start = self.page * self.page_height + 1
+            # print(f"Moving down a page to start index of {start_index} added to {page_start}")
             self.column_index = 0
-            self.index = self.page * self.page_height + start_index
+            self.index = page_start + start_index
             self.page_start_letter = is_letter
         else:
             # Move over a column
             self.column_index = (self.column_index + 1) % len(self.columns)
-            self.index = self.page * self.page_height + start_index
+            column_start = self.page * self.page_height + 1
+            self.index = column_start + start_index
             if self.page == 0:
-                self.index += 4
+                self.index += 3
             if self.page_start_letter:
                 self.index += 1
-            # print(f"  moving to start index of {start_index}")
+            # print(f"  shifting a column and moving to start at index {self.index}")
 
 parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
-parser.add_argument('--pta-files', nargs='+', help='the PTA directory files')
+parser.add_argument('--parent-files', nargs='+', help='the parent directory files')
 parser.add_argument('--class-list', help='the class list file')
 
 args = parser.parse_args()
@@ -769,9 +835,20 @@ class AllData:
         # Replace students in the class list with those from the parent information
         # since it contains more information
         for c in class_lists:
-            pta_students = {s: s for s in students if s.teacher == c.teacher}
+            parent_students = {s: s for s in students if s.teacher == c.teacher}
+            class_students = []
+            for s in c.students:
+                if s in parent_students:
+                    class_students.append(parent_students[s])
+                    del parent_students[s]
+                else:
+                    class_students.append(s)
+            class_students.sort()
 
-            class_students = sorted([pta_students[s] if s in pta_students else s for s in c.students])
+            if parent_students:
+                print(f"WARNING: Found the following students in the parent data not listed in the class data for teacher {c.teacher}")
+                print("\n".join(str(s) for s in parent_students.keys()))
+
             c.students = class_students
 
             # Replace the teacher with the data from the parent information since it has their full name
@@ -787,11 +864,11 @@ class AllData:
 
 
 class_lists = ClassListParser.parse_lists(args.class_list)
-students = PtaParser.parse_pta_students(args.pta_files)
+students = ParentParser.parse_parent_students(args.parent_files)
 
 data = AllData(class_lists, students)
 
-for output in [ ExcelOutput()]:
-    for c in class_lists:
+for output in [ ExcelOutput(data)]:
+    for c in data.class_lists:
         output.print_class(c)
     output.finish(data)
