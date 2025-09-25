@@ -1,4 +1,7 @@
 # Overview
+
+This file is part of the [pta-phonebook](https://github.com/briehman/pta-phonebook). See that link for full source code.
+
 The phone book is a parent resource to easily reference students, staff, and
 the PTA board and committee chairs. The school district provides most of the
 data and the person compiling the phone book is responsible for coordinating
