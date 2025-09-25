@@ -2,13 +2,24 @@ import argparse
 import openpyxl
 import re
 import sys
+import openpyxl.styles.builtins
 
+from copy import copy
 from itertools import groupby
 from openpyxl import Workbook
 from openpyxl.worksheet.hyperlink import Hyperlink
 from openpyxl.styles import DEFAULT_FONT, Alignment, Border, Font, NamedStyle, Side
 
+
 YEAR = '2025-2026'
+artists = {
+        'front':        ['Cadence MacDougall', '5th grade'],
+        'front inside': ['Patrick Riehman', '3rd grade'],
+        'back inside':  ['Olivia Stelle', '4th grade'],
+        'back':         ['Mabel McCahill', '4th grade'],
+        }
+
+openpyxl.styles.builtins.hyperlink
 
 def fix_name(s):
     # Mcdonald -> McDonald
@@ -175,7 +186,7 @@ class Guardian:
         return f"https://call.ctrlq.org/1{self.phone.replace('-', '')}" if self.phone else ''
 
     def email_link(self):
-        return f"mailto:t{self.email}" if self.email else ''
+        return f"mailto:{self.email}" if self.email else ''
 
     def __repr__(self):
         return str(self)
@@ -276,8 +287,7 @@ class TextOutput:
 
 class ExcelOutput:
 
-    blank_guardian = Guardian(name='', email='', phone='', address='')
-    centered = Alignment(horizontal='center', vertical='center')
+    hyperlink_font = Font(name='Arial', underline='single', size=10, color='3366FF')
 
     @staticmethod
     def google_width(num):
@@ -310,6 +320,11 @@ class ExcelOutput:
         tableheading.border = Border(top=medium_border, bottom=medium_border)
         self.wb.add_named_style(tableheading)
 
+        tableheadingbegin = NamedStyle(name='tableheadingbegin')
+        tableheadingbegin.font = Font(name='Arial', bold=True, size=9)
+        tableheadingbegin.border = Border(top=medium_border, bottom=medium_border, left=medium_border)
+        self.wb.add_named_style(tableheadingbegin)
+
         tableheadingend = NamedStyle(name='tableheadingend')
         tableheadingend.font = Font(name='Arial', bold=True, size=9)
         tableheadingend.border = Border(top=medium_border, bottom=medium_border, right=medium_border)
@@ -335,7 +350,8 @@ class ExcelOutput:
         self.wb.add_named_style(indexstudent)
 
         self.create_welcome()
-        self.create_toc()
+        # The links in the TOC are not preserved when sheets exports as PDF
+        # self.create_toc()
         self.create_staff()
 
     def create_welcome(self):
@@ -370,33 +386,40 @@ class ExcelOutput:
         ws['A11'].font = Font(name='Arial', size=14)
         ws['A11'].alignment = Alignment(horizontal='center')
 
-        ws['A13'] = 'VOICEMAIL/ATTENDANCE 630-827-4201'
-        ws['A13'].font = Font(name='Arial', size=14)
+        ws['A12'] = 'Voicemail / Attendance 630-827-4201'
+        ws['A12'].font = Font(name='Arial', size=14)
+        ws['A12'].alignment = Alignment(horizontal='center')
+
+        big_link = copy(self.hyperlink_font)
+        big_link.size = 14
+
+        ws['A13'] = '=hyperlink("https://wh.sd44.org")'
+        ws['A13'].font = big_link
         ws['A13'].alignment = Alignment(horizontal='center')
 
-        ws['A16'] = 'School District 44'
-        ws['A16'].font = Font(name='Arial', size=14)
+        ws['A15'] = 'School District 44'
+        ws['A15'].font = Font(name='Arial', size=14)
+        ws['A15'].alignment = Alignment(horizontal='center')
+
+        ws['A16'] = '=hyperlink("https://www.sd44.org")'
+        ws['A16'].font = big_link
         ws['A16'].alignment = Alignment(horizontal='center')
 
-        ws['A17'] = 'Website: www.sd44.org'
-        ws['A17'].font = Font(name='Arial', size=14)
-        ws['A17'].alignment = Alignment(horizontal='center')
+        # ws['A19'] = 'Mr. David Danielski'
+        # ws['A19'].font = Font(name='Arial', size=14)
+        # ws['A19'].alignment = Alignment(horizontal='center')
 
-        ws['A19'] = 'Mr. David Danielski'
-        ws['A19'].font = Font(name='Arial', size=14)
-        ws['A19'].alignment = Alignment(horizontal='center')
+        # ws['A20'] = 'PRINCIPAL'
+        # ws['A20'].font = Font(name='Arial', size=14)
+        # ws['A20'].alignment = Alignment(horizontal='center')
 
-        ws['A20'] = 'PRINCIPAL'
-        ws['A20'].font = Font(name='Arial', size=14)
-        ws['A20'].alignment = Alignment(horizontal='center')
+        # ws['A22'] = 'Ms. Liz Valdivia'
+        # ws['A22'].font = Font(name='Arial', size=14)
+        # ws['A22'].alignment = Alignment(horizontal='center')
 
-        ws['A22'] = 'Ms. Liz Valdivia'
-        ws['A22'].font = Font(name='Arial', size=14)
-        ws['A22'].alignment = Alignment(horizontal='center')
-
-        ws['A23'] = 'SECRETARY'
-        ws['A23'].font = Font(name='Arial', size=14)
-        ws['A23'].alignment = Alignment(horizontal='center')
+        # ws['A23'] = 'SECRETARY'
+        # ws['A23'].font = Font(name='Arial', size=14)
+        # ws['A23'].alignment = Alignment(horizontal='center')
 
         ws['A33'] = "THIS PTA PHONE BOOK IS FOR PARENT AND STUDENT USE ONLY,\nNOT FOR COMMERCIAL USE."
         ws['A33'].font = Font(name='Arial', size=14)
@@ -412,16 +435,10 @@ class ExcelOutput:
         margins.left = margins.right = margins.bottom = 0.25
         margins.top = 0.5
 
-        ws.column_dimensions['A'].width = ExcelOutput.google_width(128)
-        ws.column_dimensions['B'].width = ExcelOutput.google_width(140)
+        ws.column_dimensions['A'].width = ExcelOutput.google_width(250)
+        ws.column_dimensions['B'].width = ExcelOutput.google_width(124)
         ws.column_dimensions['C'].width = ExcelOutput.google_width(35)
-        ws.column_dimensions['D'].width = ExcelOutput.google_width(26)
-        ws.column_dimensions['E'].width = ExcelOutput.google_width(114)
-        ws.column_dimensions['F'].width = ExcelOutput.google_width(33)
-        ws.column_dimensions['G'].width = ExcelOutput.google_width(72)
-        ws.column_dimensions['H'].width = ExcelOutput.google_width(146)
-        ws.column_dimensions['I'].width = ExcelOutput.google_width(34)
-
+        ws.column_dimensions['D'].width = ExcelOutput.google_width(138)
 
         ws['C1'] = 'Table of Contents'
         ws['C1'].style = 'heading'
@@ -441,10 +458,6 @@ class ExcelOutput:
         ws['B6'] = 'PTA Board'
         ws['B6'].hyperlink = Hyperlink(ref="A1", location=f"PTA Board!A1", target=None)
         ws['B6'].font = Font(underline='single', color='000000')
-
-        ws['B7'] = 'PTA Calendar'
-        ws['B7'].hyperlink = Hyperlink(ref="A1", location=f"PTA Calendar!A1", target=None)
-        ws['B7'].font = Font(underline='single', color='000000')
 
         ws['D3'] = 'Class Lists'
         ws['D3'].style = 'subheading'
@@ -512,11 +525,11 @@ class ExcelOutput:
 
         ws.merge_cells('A1:E1')
         ws.merge_cells('A2:E2')
-        ws.column_dimensions['A'].width = 11
-        ws.column_dimensions['B'].width = 22.5
-        ws.column_dimensions['C'].width = 19
-        ws.column_dimensions['D'].width = 34.6
-        ws.column_dimensions['E'].width = 14
+        ws.column_dimensions['A'].width = ExcelOutput.google_width(87)
+        ws.column_dimensions['B'].width = ExcelOutput.google_width(128)
+        ws.column_dimensions['C'].width = ExcelOutput.google_width(150)
+        ws.column_dimensions['D'].width = ExcelOutput.google_width(250)
+        ws.column_dimensions['E'].width = ExcelOutput.google_width(100)
 
         ws['A1'] = cls.teacher.title
         ws['A1'].style = 'heading'
@@ -525,7 +538,7 @@ class ExcelOutput:
 
         ws.append([])
         ws.append(['Student', 'Family Address', 'Parent/Guardian', 'Email', 'Phone'])
-        ws['A4'].style = 'tableheading'
+        ws['A4'].style = 'tableheadingbegin'
         ws['B4'].style = 'tableheading'
         ws['C4'].style = 'tableheading'
         ws['D4'].style = 'tableheading'
@@ -545,14 +558,13 @@ class ExcelOutput:
 
             if num_guardians > 0:
                 ws[f'C{idx}'] = guardians[0].title()
-                ws[f'D{idx}'].hyperlink = guardians[0].email_link()
-                ws[f'D{idx}'].value = guardians[0].email
-                ws[f'D{idx}'].font = Font(underline='single', color='000000')
+                ws[f'D{idx}'].value = f'=hyperlink("{guardians[0].email_link()}", "{guardians[0].email}")'
+                ws[f'D{idx}'].font = self.hyperlink_font
                 ws[f'D{idx}'].alignment = Alignment(wrap_text=True, vertical='center')
 
-                ws[f'E{idx}'].hyperlink = guardians[0].phone_link()
-                ws[f'E{idx}'].value = guardians[0].phone
-                ws[f'E{idx}'].font = Font(underline='single', color='000000')
+                if guardians[0].phone:
+                    ws[f'E{idx}'].value = f'=hyperlink("{guardians[0].phone_link()}", "{guardians[0].phone}")'
+                ws[f'E{idx}'].font = self.hyperlink_font
                 ws[f'E{idx}'].alignment = Alignment(wrap_text=True, vertical='center')
 
                 if num_guardians > 1 or address:
@@ -577,17 +589,12 @@ class ExcelOutput:
 
             idx += 1
 
-        # TODO maybe needed? but if we set this then the text wrapping does not work
-        # for row_num in range(1, ws.max_row + 1):
-        #     ws.row_dimensions[row_num].height = 13
-
     def finish(self, data):
         self.wb.remove(self.wb.active)
         self.create_index(data)
         self.create_thank_you_page()
         self.create_pta_board_page()
-        self.create_pta_calendar_page()
-        self.wb.save('output.xlsx')
+        self.wb.save(args.output)
 
     def create_thank_you_page(self):
         ws = self.wb.create_sheet(title='Thank You')
@@ -595,7 +602,7 @@ class ExcelOutput:
         margins.left = margins.right = 0.7
         margins.top = margins.bottom = 0.75
 
-        ws.column_dimensions['A'].width = 37.7
+        ws.column_dimensions['A'].width = 30
         ws.column_dimensions['B'].width = 24.4
         ws.column_dimensions['C'].width = 11.1
 
@@ -613,31 +620,34 @@ class ExcelOutput:
         ws['B8'].style = 'subheading'
         ws['A10'] = 'Front cover'
         ws['A10'].alignment = Alignment(horizontal='right')
-        ws['A10'].font = Font(italic=True)
         ws['A11'] = 'Inside front cover'
         ws['A11'].alignment = Alignment(horizontal='right')
-        ws['A11'].font = Font(italic=True)
         ws['A12'] = 'Inside back cover'
         ws['A12'].alignment = Alignment(horizontal='right')
-        ws['A12'].font = Font(italic=True)
         ws['A13'] = 'Back cover'
         ws['A13'].alignment = Alignment(horizontal='right')
-        ws['A13'].font = Font(italic=True)
 
-        ws['B10'] = 'Name 1'
+        ws['B10'] = artists['front'][0]
         ws['B10'].style = 'subheading'
-        ws['C10'] = 'Nth grade'
-        ws['B11'] = 'Name 2'
-        ws['B11'].style = 'subheading'
-        ws['C11'] = 'Nth grade'
-        ws['B12'] = 'Name 3'
-        ws['B12'].style = 'subheading'
-        ws['C12'] = 'Nth grade'
-        ws['B13'] = 'Name 4'
-        ws['B13'].style = 'subheading'
-        ws['C13'] = 'Nth grade'
+        ws['B10'].alignment = Alignment(vertical='bottom')
+        ws['C10'] = artists['front'][1]
 
-        img = openpyxl.drawing.image.Image('making-a-difference.png')
+        ws['B11'] = artists['front inside'][0]
+        ws['B11'].style = 'subheading'
+        ws['B11'].alignment = Alignment(vertical='bottom')
+        ws['C11'] = artists['front inside'][1]
+
+        ws['B12'] = artists['back inside'][0]
+        ws['B12'].style = 'subheading'
+        ws['B12'].alignment = Alignment(vertical='bottom')
+        ws['C12'] = artists['back inside'][1]
+
+        ws['B13'] = artists['back'][0]
+        ws['B13'].style = 'subheading'
+        ws['B13'].alignment = Alignment(vertical='bottom')
+        ws['C13'] = artists['back'][1]
+
+        img = openpyxl.drawing.image.Image('images/making-a-difference.png')
         img.anchor = 'B15'
         ws['B15'].alignment = Alignment(horizontal='center')
         ws.add_image(img)
@@ -658,7 +668,7 @@ class ExcelOutput:
         ws['B31'] = 'Please join us at a monthly PTA meeting'
         ws['B31'].font = Font(name='Arial', bold=True, size=14)
         ws['B31'].alignment = Alignment(horizontal='center')
-        ws['B32'] = 'or contact hammerschmidtpta@gmail.com'
+        ws['B32'] = 'or contact president.whspta@gmail.com'
         ws['B32'].font = Font(name='Arial', bold=True, size=14)
         ws['B32'].alignment = Alignment(horizontal='center')
         ws['B33'] = 'for more information about how you can get involved. '
@@ -669,34 +679,16 @@ class ExcelOutput:
         ws = self.wb.create_sheet(title='PTA Board')
         margins = ws.page_margins
         margins.left = margins.right = 0.25
-        margins.top = margins.bottom = 0.5
+        margins.top = margins.bottom = 0.25
 
         ws.column_dimensions['A'].width = 30.7
         ws.column_dimensions['B'].width = 27.8
         ws.column_dimensions['C'].width = 272
+        ws.merge_cells('A1:C1')
 
         ws['B2'] = f'William Hammerschmidt School PTA Board {YEAR}'
         ws['B2'].alignment = Alignment(horizontal='center')
-        ws['B2'].font = Font(size=13, bold=True)
-
-    def create_pta_calendar_page(self):
-        ws = self.wb.create_sheet(title='PTA Calendar')
-        margins = ws.page_margins
-        margins.left = 0.5
-        margins.right = 0.25
-        margins.top = margins.bottom = 0.25
-
-        ws.column_dimensions['A'].width = 6.42
-        ws.column_dimensions['B'].width = 7.71
-        ws.column_dimensions['C'].width = 14.2
-        ws.column_dimensions['D'].width = 14.2
-        ws.column_dimensions['E'].width = 15.85
-        ws.column_dimensions['F'].width = 8.85
-        ws.column_dimensions['G'].width = 14.2
-
-        ws['D2'] = f'{YEAR} Hammerschmidt PTA Calendar'
-        ws['D2'].style = 'subheading'
-        ws['D2'].alignment = Alignment(horizontal='left')
+        ws['B2'].font = Font(size=11, bold=True)
 
     def create_index(self, data):
         ws = self.wb.create_sheet(title='Student Index')
@@ -716,7 +708,7 @@ class ExcelOutput:
         ws['A2'].style = 'subheading'
         ws['A2'].font = Font(name='Arial', bold=True, size=10)
 
-        name_width = 27.8
+        name_width = 25
         grade_width = 3.85
         teacher_width = 14.42
 
@@ -818,6 +810,7 @@ class ExcelIndexPositioner:
             # print(f"  shifting a column and moving to start at index {self.index}")
 
 parser = argparse.ArgumentParser(prog='PROG', usage='%(prog)s [options]')
+parser.add_argument('--output', help='the output file path')
 parser.add_argument('--parent-files', nargs='+', help='the parent directory files')
 parser.add_argument('--class-list', help='the class list file')
 
