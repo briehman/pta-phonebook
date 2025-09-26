@@ -118,7 +118,7 @@ your machine. Run the python import script such as below:
 python3 import.py \
   --parent-files ~/dev/personal/pta-phonebook/files/PTA\ Directory\ [123]*.xlsx \
   --class-list ~/dev/personal/pta-phonebook/files/PTA\ CLASS\ LISTS\ 25-26.xlsx \
-  --output output.xlsx
+  --output "WHS PTA Phone Book 2025-2026.xlsx"
 ```
 
 This process will warn if any students are found in the student and guardian
@@ -130,14 +130,9 @@ Spot check the Excel file to ensure it looks correct.
 
 ### Format the data
 
-1. Take the generated skeleton file and upload it to Google Sheets.
-2. Name the file WHS PTA Phone Book 20XX-20YY with the correct years
-3. Update the class column widths
-   - When Google Sheets converts from Excel to Google Sheets it does not respect
-     the column width. Change column B to width 128 pixels and column D to 250.
-     I recorded a macro while doing this and ran it across all the class worksheets.
-4. Copy the Staff and PTA worksheets you had generated into this new sheet
-5. Spot check the worksheets to ensure they are accurate
+1. Take the generated skeleton file and import it to a new Google Sheets file.
+2. Spot check the worksheets to ensure they are accurate
+3. Print preview to ensure each worksheet fits on one page with 0.25" margins
 
 ### Produce a PDF
 
@@ -185,8 +180,9 @@ This will combine the artwork with the downloaded PDF into the final file.
 Review the resulting file to ensure it is accurate. Check for glaring errors
 and have a second set of eyes look it over.
 
-Once ready, send it to the Membership committee chairperson to distribute to
-the PTA members.
+Upload the files to the WHS PTA Google Drive under the Phone Book folder
+and a subfolder for the appropriate year. Reach out to the Membership committee
+chairperson who will email it to the PTA members.
 
 For the students, Mr. Hoganson owns Graphic Arts Services and prints four
 copies to give to the cover artwork contest winners. Mrs. Hoganson distributes
