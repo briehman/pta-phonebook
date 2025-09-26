@@ -386,7 +386,7 @@ class ExcelOutput:
         ws['A11'].font = Font(name='Arial', size=14)
         ws['A11'].alignment = Alignment(horizontal='center')
 
-        ws['A12'] = 'Voicemail / Attendance 630-827-4201'
+        ws['A12'] = 'Voicemail / Attendance: 630-827-4201'
         ws['A12'].font = Font(name='Arial', size=14)
         ws['A12'].alignment = Alignment(horizontal='center')
 
