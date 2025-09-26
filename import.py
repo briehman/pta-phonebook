@@ -23,7 +23,12 @@ openpyxl.styles.builtins.hyperlink
 
 def fix_name(s):
     # Mcdonald -> McDonald
-    return re.sub(r"Mc([a-z])", lambda m: "Mc" + m.group(1).upper(), s)
+    name = re.sub(r"Mc([a-z])", lambda m: "Mc" + m.group(1).upper(), s)
+
+    # (Rj) -> (RJ).  Hopefully they do not put nicknames that aren't capitalized in parens
+    name = re.sub(r"(\(.*?\))", lambda m: m.group(1).upper(), name)
+
+    return name
 
 class Student:
     def __init__(self, name, grade, teacher, guardians=None):
