@@ -602,9 +602,9 @@ class ExcelOutput:
         margins.left = margins.right = 0.7
         margins.top = margins.bottom = 0.75
 
-        ws.column_dimensions['A'].width = 30
-        ws.column_dimensions['B'].width = 24.4
-        ws.column_dimensions['C'].width = 11.1
+        ws.column_dimensions['A'].width = ExcelOutput.google_width(260)
+        ws.column_dimensions['B'].width = ExcelOutput.google_width(194)
+        ws.column_dimensions['C'].width = ExcelOutput.google_width(90)
 
         ws['B2'] = 'Many thanks to Mr. Hoganson and Graphics Arts Services, Inc.'
         ws['B2'].style = 'subheading'
@@ -629,22 +629,22 @@ class ExcelOutput:
 
         ws['B10'] = artists['front'][0]
         ws['B10'].style = 'subheading'
-        ws['B10'].alignment = Alignment(vertical='bottom')
+        ws['B10'].alignment = Alignment(horizontal = 'center', vertical='bottom')
         ws['C10'] = artists['front'][1]
 
         ws['B11'] = artists['front inside'][0]
         ws['B11'].style = 'subheading'
-        ws['B11'].alignment = Alignment(vertical='bottom')
+        ws['B11'].alignment = Alignment(horizontal = 'center', vertical='bottom')
         ws['C11'] = artists['front inside'][1]
 
         ws['B12'] = artists['back inside'][0]
         ws['B12'].style = 'subheading'
-        ws['B12'].alignment = Alignment(vertical='bottom')
+        ws['B12'].alignment = Alignment(horizontal = 'center', vertical='bottom')
         ws['C12'] = artists['back inside'][1]
 
         ws['B13'] = artists['back'][0]
         ws['B13'].style = 'subheading'
-        ws['B13'].alignment = Alignment(vertical='bottom')
+        ws['B13'].alignment = Alignment(horizontal = 'center', vertical='bottom')
         ws['C13'] = artists['back'][1]
 
         img = openpyxl.drawing.image.Image('images/making-a-difference.png')
