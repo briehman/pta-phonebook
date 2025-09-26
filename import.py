@@ -607,7 +607,7 @@ class ExcelOutput:
         margins.left = margins.right = 0.7
         margins.top = margins.bottom = 0.75
 
-        ws.column_dimensions['A'].width = ExcelOutput.google_width(260)
+        ws.column_dimensions['A'].width = ExcelOutput.google_width(245)
         ws.column_dimensions['B'].width = ExcelOutput.google_width(194)
         ws.column_dimensions['C'].width = ExcelOutput.google_width(90)
 
